@@ -1,0 +1,31 @@
+services:
+  fakes3:
+    build: .
+    image: fakes3:latest
+    container_name: fakes3
+    ports:
+      - "${FAKE_S3_PORT:-9000}:9000"
+    volumes:
+      # Bind-mount so stored objects stay browsable at ./storage on the host,
+      # exactly like running the server outside Docker. Swap for the named
+      # volume below if you prefer Docker-managed storage.
+      - ./storage:/data
+      # - fakes3-data:/data
+    environment:
+      FAKE_S3_REGION: us-east-1
+      FAKE_S3_SINGLE_BUCKET: "1"
+      FAKE_S3_BUCKET_NAME: mybucket
+      FAKE_S3_AUTO_CREATE: "1"
+      # Add your compose service names here if other containers address the
+      # server virtual-hosted-style (bucket.fakes3:9000).
+      FAKE_S3_VHOST_BASES: localhost,host.docker.internal,fakes3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9000/health')"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+# volumes:
+#   fakes3-data:

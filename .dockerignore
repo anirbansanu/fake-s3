@@ -1,0 +1,34 @@
+# Version control
+.git
+.gitignore
+
+# Virtual environments
+.venv
+venv
+env
+
+# Python cache
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Stored objects (runtime data, mounted as a volume — never baked into the image)
+storage
+
+# Editor / IDE
+.vscode
+.idea
+
+# Docs and Docker files themselves (not needed inside the image)
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# OS cruft and logs
+.DS_Store
+Thumbs.db
+*.log
