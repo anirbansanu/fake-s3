@@ -1,8 +1,8 @@
 # Fake S3 — Local Amazon S3 Server Replica
 
-`fakes3.py` is a single-file server that replicates the **real Amazon S3 REST/XML
-wire protocol** on your local machine. AWS SDKs connect to it directly as a
-drop-in S3 replacement — no wrapper code needed:
+fakes3 replicates the **real Amazon S3 REST/XML wire protocol** on your local
+machine. AWS SDKs connect to it directly as a drop-in S3 replacement — no
+wrapper code needed:
 
 - **Laravel** — the native `s3` filesystem disk (`Storage::disk('s3')`) via
   league/flysystem-aws-s3-v3
@@ -23,13 +23,34 @@ storage/
 Set `FAKE_S3_SINGLE_BUCKET=0` if you need real-S3 multi-bucket layout instead
 (`storage/<bucket>/<key>`, buckets isolated from each other).
 
+The project ships as a Python package with two front-ends over one shared
+backend, plus a legacy single-file build:
+
+| Entry point | What it is |
+|---|---|
+| `python -m fakes3` / `fakes3-cli.exe serve` | Headless server (CLI) |
+| `python -m fakes3.gui` / `fakes3-gui.exe` | Desktop manager: server control, config, live logs, object browser, stats, tray |
+| `fakes3.py` | Legacy single-file server (kept for drop-in use; the package is the maintained path) |
+
+```
+fakes3/
+  core/      # storage engine: buckets, objects, metadata sidecars, multipart
+  server/    # FastAPI app, S3 dispatch, admin API, in-process ServerController
+  cli/       # click-based CLI (server, bucket, object, config, doctor commands)
+  gui/       # PySide6 desktop app
+  config.py  # ServerConfig + persisted config (%APPDATA%\fakes3\config.json)
+  logsys.py  # logging + in-memory ring buffer (feeds GUI + admin API)
+  stats.py   # request counters
+  client.py  # stdlib S3/admin client used by the CLI
+```
+
 ## 1. Setup and start
 
-Python 3.10+ with two packages (a ready venv lives in `.venv/`):
+Python 3.10+ (a ready venv lives in `.venv/`):
 
 ```bash
-pip install fastapi uvicorn
-python fakes3.py
+pip install -r requirements.txt
+python -m fakes3            # or: python fakes3.py (legacy single-file)
 ```
 
 The server listens on **http://localhost:9000**. Verify:
@@ -148,9 +169,80 @@ point the endpoint at `http://host.docker.internal:9000`.
   lifecycle (writes accepted and ignored; reads return the canonical
   "not found" codes), POST form uploads, UploadPartCopy, GetObjectAttributes.
 
-## 5. Verification
+## 5. CLI application
 
-A boto3-based compatibility suite (32 checks: bucket lifecycle, uploads,
-downloads, ranges, conditionals, listings and pagination, multipart,
-presigned URLs and expiry, bulk delete, aws-chunked framing, virtual-hosted
-addressing) runs green against this server.
+Every command works against any running fakes3 instance (package, exe, or
+Docker) via `--endpoint` / `FAKE_S3_ENDPOINT` (default `http://localhost:9000`):
+
+```bash
+fakes3 serve --port 9000 --storage ./storage    # run the server (Ctrl+C stops)
+fakes3 status                                   # status + uptime
+fakes3 stats                                    # request counters, storage usage
+fakes3 logs --follow                            # live server logs
+fakes3 doctor                                   # diagnostics
+
+fakes3 bucket ls | mb NAME | rb NAME [--force]
+fakes3 object ls BUCKET [--prefix P]
+fakes3 object put BUCKET KEY FILE [--content-type T] [--meta K=V]
+fakes3 object get BUCKET KEY [DEST]
+fakes3 object cp|mv BUCKET SRC_KEY DST_KEY [--dest-bucket B]
+fakes3 object rm BUCKET KEY
+fakes3 object stat BUCKET KEY
+
+fakes3 config show | get KEY | set KEY VALUE | unset KEY | path
+fakes3 config export FILE | import FILE
+```
+
+In development, run it as `python -m fakes3.cli`. The CLI talks to the server
+over HTTP: S3 operations use the S3 API, management commands use the admin API
+under `/_fakes3/` (status, stats, logs, config — bucket names can never
+contain `_`, so the prefix cannot collide with S3 traffic).
+
+## 6. GUI application
+
+`python -m fakes3.gui` (or `fakes3-gui.exe`) opens a desktop manager built on
+the same backend package:
+
+- **Server panel** — start / stop / restart, status, uptime, endpoint.
+- **Browser** — buckets and objects: upload (file dialog or drag-and-drop),
+  download, rename/move, copy, delete, new folder, bucket create/rename/delete
+  (multi-bucket mode), and an object metadata dialog (ETag, Content-Type,
+  `x-amz-meta-*`).
+- **Logs** — live request/error log with level filter, pause, auto-scroll.
+- **Statistics** — request counts by method, errors, bytes in/out, storage usage.
+- **Settings** — host, port, storage folder, region, bucket mode/name,
+  auto-create, vhost bases; app preferences (minimize to tray, notifications,
+  start with Windows, start server on launch, optional log file);
+  config import/export.
+- **Tray** — minimizes to the system tray; balloon notifications on server
+  start/stop/errors; quick start/stop from the tray menu.
+
+Settings persist to `%APPDATA%\fakes3\config.json` and are shared with
+`fakes3 serve` and `fakes3 config`.
+
+## 7. Standalone Windows executables
+
+Build self-contained exes (no Python required on the target machine):
+
+```powershell
+pip install -r requirements-dev.txt
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+```
+
+Outputs land in `dist\`: **fakes3-cli.exe** (console) and **fakes3-gui.exe**
+(windowed). Both are PyInstaller onefile builds with all dependencies embedded.
+
+## 8. Verification
+
+A boto3-based compatibility suite (`tests/`, 44 checks: bucket lifecycle,
+uploads, downloads, ranges, conditionals, listings and pagination, multipart,
+presigned URLs and expiry, bulk delete, aws-chunked framing, admin API,
+in-process controller, CLI end-to-end) runs green against this server:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+Set `FAKES3_TEST_TARGET` to point the suite at any entry point, e.g.
+`FAKES3_TEST_TARGET="dist/fakes3-cli.exe serve" pytest tests/`.

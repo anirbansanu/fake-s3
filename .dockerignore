@@ -28,6 +28,16 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
+# Development, tests, packaging, build outputs (server image needs none of it)
+tests
+packaging
+dist
+build
+requirements-dev.txt
+fakes3/gui
+fakes3/cli
+fakes3.py
+
 # OS cruft and logs
 .DS_Store
 Thumbs.db

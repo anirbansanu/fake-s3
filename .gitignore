@@ -19,6 +19,9 @@ htmlcov/
 # Stored objects (runtime data created by the server)
 storage/
 
+# Generated packaging artifacts
+packaging/icons/
+
 # fakes3 bookkeeping files, wherever they land
 *.fake-s3-meta
 *.fake-s3-part

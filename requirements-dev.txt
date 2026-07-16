@@ -1,0 +1,7 @@
+# Development / test / build dependencies (not needed at runtime)
+-r requirements.txt
+boto3
+pytest
+requests
+PySide6-Essentials
+pyinstaller

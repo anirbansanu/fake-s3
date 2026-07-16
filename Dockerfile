@@ -19,7 +19,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY fakes3.py .
+COPY fakes3/ ./fakes3/
 
 # Run as an unprivileged user; objects are stored under /data (a volume).
 RUN useradd --create-home --uid 1000 appuser \
@@ -37,4 +37,4 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import os,urllib.request;urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('FAKE_S3_PORT','9000')}/health\")" || exit 1
 
-CMD ["python", "fakes3.py"]
+CMD ["python", "-m", "fakes3"]
